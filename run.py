@@ -1,122 +1,92 @@
 import torch
 from transformers import AutoProcessor, AutoModelForCausalLM, AutoConfig
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, random_split
 from PIL import Image
 import json
 import os
 
+from .train_compressor import train
+from .data import VQADataset
+from .inference import run_example, evaluate
+
 from soap import SOAP
 import argparse
 
-class FlorenceDataset(Dataset):
-    def __init__(self, image_dir, annotation_dir, prompt_dir, processor):
-        self.image_dir = image_dir
-        self.annotation_dir = annotation_dir
-        self.prompt_dir = prompt_dir
-        self.processor = processor
-        
-        # Load all files in __init__
-        self.image_files = sorted([f for f in os.listdir(self.image_dir) if f.endswith(('.png', '.jpg', '.jpeg'))])
-        
-        # Load all prompts and annotations in __init__
-        self.prompts = {}
-        self.annotations = {}
-        with open(os.path.join(self.prompt_dir, 'questions.json'), 'r', encoding='utf-8') as pf:
-            self.prompts = json.load(pf)
-        
-        def __len__(self):
-            return len(self.image_files)
-
-        def __getitem__(self, idx):
-        # Get image file directly by index
-        image_file = self.image_files[idx]
-        
-        # Load image
-        image_path = os.path.join(self.image_dir, image_file)
-        image = Image.open(image_path).convert('RGB')
-        
-        # Get prompt and annotation from pre-loaded dictionaries
-        prompt = self.prompts[image_file]
-        annotation = self.annotations[image_file]
-        
-        # Process inputs
-        inputs = self.processor(text=prompt, images=image, return_tensors="pt")
-        labels = self.processor.tokenizer(text=annotation, return_tensors="pt", padding=True, return_token_type_ids=False)
-        
-        return {
-            'pixel_values': inputs['pixel_values'].squeeze(0),
-            'input_ids': inputs['input_ids'].squeeze(0),
-            'labels': labels['input_ids'].squeeze(0)
-        }
 
 def main(args):
     # Configuration
     model_name = "./" + args.model_name
-    image_dir = args.image_dir
-    annotation_dir = args.annotation_dir
-    prompt_dir = args.prompt_dir
     epochs = 3
     batch_size = 4
     learning_rate = 5e-5
-    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Load model and processor
     config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
-    
-    processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained(model_name, config=config, trust_remote_code=True)
-    
-    # Create dataset and dataloader
-    dataset = FlorenceDataset(image_dir, annotation_dir, prompt_dir, processor)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    
-    # Setup training
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model.to(device)
-    optimizer = SOAP(model.parameters(), lr=learning_rate)
-    
-    # Training loop
-    model.train()
-    for epoch in range(epochs):
-        total_loss = 0
-        for batch_idx, batch in enumerate(dataloader):
-            pixel_values = batch['pixel_values'].to(device)
-            input_ids = batch['input_ids'].to(device)
-            labels = batch['labels'].to(device)
-            
-            outputs = model(pixel_values=pixel_values, input_ids=input_ids, labels=labels)
-            loss = outputs.loss
-            
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            
-            total_loss += loss.item()
-            
-            if batch_idx % 10 == 0:
-                print(f"Epoch {epoch+1}/{epochs}, Batch {batch_idx}, Loss: {loss.item():.4f}")
-        
-        avg_loss = total_loss / len(dataloader)
-        print(f"Epoch {epoch+1} completed. Average Loss: {avg_loss:.4f}")
-    
-    # Save the fine-tuned model
-    model.save_pretrained("./florence_finetuned")
-    processor.save_pretrained("./florence_finetuned")
-    print("Model saved successfully!")
+    config.compression_mode = args.compression_mode
+    config.compression_factor = args.compression_factor
+    config.compression_stage = args.compression_stage
+    config.compression_sorted = args.compression_sorted
 
+    processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True).to(device)
+    model = AutoModelForCausalLM.from_pretrained(model_name, config=config, trust_remote_code=True).to(device)
+
+    # Create dataset and dataloader
+    dataset = VQADataset(
+        pct_data = args.pct_data,
+        data_path = args.data_dir,
+        annotation_folder = args.annotation_folder,
+        question_folder = args.prompt_folder,
+        image_folder = args.image_folder,
+        image_prefix = args.image_prefix,
+    )
+
+    def collate_fn(batch):
+        questions, answers, images = zip(*batch)
+        inputs = processor(
+            text=list(questions), images=list(images), return_tensors="pt", padding=True
+        ).to(device)
+        return inputs, answers
+
+    train_size = int(0.8 * len(dataset))  # 80% train
+    test_size = len(dataset) - train_size  # 20% test
+    train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+    train_dataloader = DataLoader(train_dataset, collate_fn=collate_fn, batch_size=batch_size, shuffle=True)
+    test_dataloader = DataLoader(test_dataset, collate_fn=collate_fn,batch_size=batch_size, shuffle=False)
+
+    # TODO
+    if args.compression_mode in ['avg_pool', 'learnable_pool']:
+        # Train the model with compression
+        train(
+            model=model,
+            processor=processor,
+            dataloader=train_dataloader,
+            epochs=epochs,
+            learning_rate=learning_rate
+        )
+    
+    # Inference example on test images
+    answers, avg_levenshtein_similarity = evaluate(model, processor, test_dataloader)
+
+    print("Evaluation Results:")
+    print(f"Average Levenshtein Similarity: {avg_levenshtein_similarity:.4f}")
+    
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Fine-tune Florence-2 model')
     parser.add_argument('--model_name', type=str, default='Florence-2-base', help='Model name')
-    parser.add_argument('--compression_mode', type=str, default=None, help='Compression mode: avg_pool or learnable_pool')
+    parser.add_argument('--compression_mode', type=str, choices=['avg_pool', 'learnable_pool', 'none'], default=None, help='Compression mode: avg_pool or learnable_pool')
     parser.add_argument('--compression_factor', type=int, default=None, help='Compression factor (pool size)')
     parser.add_argument('--compression_stage', type=int, default=None, help='Layer index to apply compression at')
     parser.add_argument('--compression_sorted', action='store_true', help='Whether to sort inputs for learnable pooling')
 
     # Training if compression if learnable pooling
-    parser.add_argument('--prompt_dir', type=str, default='./data/prompts', help='Directory containing prompts')
-    parser.add_argument('--annotation_dir', type=str, default='./data/annotations', help='Directory containing annotations')
-    parser.add_argument('--image_dir', type=str, default='./data/images', help='Directory containing images')
+    parser.add_argument('--data_dir', type=str, default='./Data', help='Directory containing dataset')
+    parser.add_argument('--prompt_folder', type=str, default='v2_Questions', help='Folder containing prompts')
+    parser.add_argument('--annotation_folder', type=str, default='v2_Annotations', help='Folder containing annotations')
+    parser.add_argument('--image_folder', type=str, default='train2014_image', help='Folder containing images')
+    parser.add_argument('--pct_data', type=int, default=1, help='Percentage of data to use for training (e.g., 1, 5, 10, 100)')
+    parser.add_argument('--image_prefix', type=str, default='COCO_train2014_', help='Prefix for image filenames')
     parser.add_argument('--epochs', type=int, default=3, help='Number of training epochs')
     parser.add_argument('--batch_size', type=int, default=4, help='Batch size for training')
     parser.add_argument('--learning_rate', type=float, default=5e-5, help='Learning rate')

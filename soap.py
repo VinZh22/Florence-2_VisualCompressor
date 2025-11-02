@@ -1,3 +1,8 @@
+"""
+Code directly taken from https://github.com/nikhilvyas/SOAP
+Paper : https://arxiv.org/abs/2409.11321
+"""
+
 import torch
 import torch.nn as nn
 import torch.optim as optim

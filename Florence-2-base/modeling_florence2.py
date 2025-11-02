@@ -59,7 +59,7 @@ from transformers.modeling_outputs import (
     Seq2SeqModelOutput,
 )
 
-from compression_fct import compress_average_pooling, Learnable_pooling
+from .compression_fct import compress_average_pooling, Learnable_pooling
 
 
 if is_flash_attn_2_available():

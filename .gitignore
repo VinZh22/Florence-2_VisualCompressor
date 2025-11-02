@@ -6,3 +6,14 @@ Data/train2014.zip
 ## Big files
 Florence-2-base/model.safetensors
 Florence-2-base/pytorch_model.bin
+
+# Ignore test edits
+test-florence.py
+
+# Ignore VSCode settings
+.vscode/
+
+## Ignore data
+Data/
+# except preprocess notebook
+!Data/preprocess.ipynb

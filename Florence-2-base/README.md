@@ -1,6 +1,6 @@
 ---
 license: mit
-license_link: https://huggingface.co/microsoft/Florence-2-base/resolve/main/LICENSE
+license_link: https://huggingface.co/microsoft/Florence-2-base-ft/resolve/main/LICENSE
 pipeline_tag: image-text-to-text
 tags:
 - vision
@@ -23,7 +23,7 @@ Resources and Technical Documentation:
 | Florence-2-base[[HF]](https://huggingface.co/microsoft/Florence-2-base) | 0.23B  | Pretrained model with FLD-5B  
 | Florence-2-large[[HF]](https://huggingface.co/microsoft/Florence-2-large) | 0.77B  | Pretrained model with FLD-5B  
 | Florence-2-base-ft[[HF]](https://huggingface.co/microsoft/Florence-2-base-ft) | 0.23B  | Finetuned model on a colletion of downstream tasks
-| Florence-2-large-ft[[HF]](https://huggingface.co/microsoft/Florence-2-large-ft) | 0.77B | Finetuned model on a colletion of downstream tasks
+| Florence-2-large-ft[[HF]](https://huggingface.co/microsoft/Florence-2-large-ft) | 0.77B  | Finetuned model on a colletion of downstream tasks
  
 ## How to Get Started with the Model
 
@@ -38,8 +38,8 @@ from transformers import AutoProcessor, AutoModelForCausalLM
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
 
-model = AutoModelForCausalLM.from_pretrained("microsoft/Florence-2-base", torch_dtype=torch_dtype, trust_remote_code=True).to(device)
-processor = AutoProcessor.from_pretrained("microsoft/Florence-2-base", trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained("microsoft/Florence-2-base-ft", torch_dtype=torch_dtype, trust_remote_code=True).to(device)
+processor = AutoProcessor.from_pretrained("microsoft/Florence-2-base-ft", trust_remote_code=True)
 
 prompt = "<OD>"
 
@@ -53,7 +53,7 @@ generated_ids = model.generate(
     pixel_values=inputs["pixel_values"],
     max_new_tokens=1024,
     do_sample=False,
-    num_beams=3,
+    num_beams=3
 )
 generated_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
 
@@ -82,8 +82,8 @@ from transformers import AutoProcessor, AutoModelForCausalLM
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
 
-model = AutoModelForCausalLM.from_pretrained("microsoft/Florence-2-base", torch_dtype=torch_dtype, trust_remote_code=True).to(device)
-processor = AutoProcessor.from_pretrained("microsoft/Florence-2-base", trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained("microsoft/Florence-2-base-ft", torch_dtype=torch_dtype, trust_remote_code=True).to(device)
+processor = AutoProcessor.from_pretrained("microsoft/Florence-2-base-ft", trust_remote_code=True)
 
 url = "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/transformers/tasks/car.jpg?download=true"
 image = Image.open(requests.get(url, stream=True).raw)
@@ -114,7 +114,6 @@ Here are the tasks `Florence-2` could perform:
 <summary> Click to expand </summary>
 
 
-
 ### Caption
 ```python
 prompt = "<CAPTION>"
@@ -139,7 +138,7 @@ caption to phrase grounding task requires additional text input, i.e. caption.
 Caption to phrase grounding results format: 
 {'\<CAPTION_TO_PHRASE_GROUNDING>': {'bboxes': [[x1, y1, x2, y2], ...], 'labels': ['', '', ...]}}
 ```python
-task_prompt = "<CAPTION_TO_PHRASE_GROUNDING>"
+task_prompt = '<CAPTION_TO_PHRASE_GROUNDING>"
 results = run_example(task_prompt, text_input="A green car parked in front of a yellow building.")
 ```
 
@@ -171,6 +170,7 @@ Dense region caption results format:
 prompt = "<REGION_PROPOSAL>"
 run_example(prompt)
 ```
+
 
 ### OCR 
 
