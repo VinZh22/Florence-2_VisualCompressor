@@ -20,7 +20,8 @@ def main(args):
     batch_size = 4
     learning_rate = 5e-5
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    print(f"Using device: {device}")
+    print("Loading model and processor...")
     # Load model and processor
     config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
     config.compression_mode = args.compression_mode
@@ -30,7 +31,7 @@ def main(args):
 
     processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True).to(device)
     model = AutoModelForCausalLM.from_pretrained(model_name, config=config, trust_remote_code=True).to(device)
-
+    print("Loading dataset...")
     # Create dataset and dataloader
     dataset = VQADataset(
         pct_data = args.pct_data,
@@ -56,6 +57,7 @@ def main(args):
 
     # TODO
     if args.compression_mode in ['avg_pool', 'learnable_pool']:
+        print("Starting training...")
         # Train the model with compression
         train(
             model=model,
@@ -65,11 +67,15 @@ def main(args):
             learning_rate=learning_rate
         )
     
+    print("Running inference on test images...")
     # Inference example on test images
     answers, avg_levenshtein_similarity = evaluate(model, processor, test_dataloader)
 
     print("Evaluation Results:")
     print(f"Average Levenshtein Similarity: {avg_levenshtein_similarity:.4f}")
+    print("Sample Answers:")
+    for i, answer in enumerate(answers[:5]):
+        print(f"Answer {i+1}: {answer}")
     
 if __name__ == "__main__":
 
