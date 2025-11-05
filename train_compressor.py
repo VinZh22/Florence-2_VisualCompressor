@@ -14,7 +14,7 @@ def train(model, processor, dataloader, epochs, learning_rate = 5e-5):
     optimizer = SOAP(model.parameters(), lr=learning_rate)
     # freeze all parameter except compression module
     for name, param in model.named_parameters():
-        if 'compression_module' not in name:
+        if 'pooling_mlp' not in name:
             param.requires_grad = False
         else:
             param.requires_grad = True
@@ -42,8 +42,4 @@ def train(model, processor, dataloader, epochs, learning_rate = 5e-5):
         avg_loss = total_loss / len(dataloader)
         print(f"Epoch {epoch+1} completed. Average Loss: {avg_loss:.4f}")
     
-    # Save the fine-tuned model
-    model.save_pretrained("./florence_compressor_finetuned")
-    processor.save_pretrained("./florence_compressor_finetuned")
-    print("Model saved successfully!")
     return model, processor

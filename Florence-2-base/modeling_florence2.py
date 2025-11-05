@@ -1676,9 +1676,10 @@ class Florence2Decoder(Florence2LanguagePreTrainedModel):
         self._use_flash_attention_2 = config._attn_implementation == "flash_attention_2"
         self._use_sdpa = config._attn_implementation == "sdpa"
 
+        # NEW HERE
         # Compressio settings
         self.compression_mode = config.compression_mode
-        if not config.compression_mode is None:
+        if config.compression_mode != "none":
             self.grouping_layer = config.compression_stage
             self.pooling_factor = config.compression_factor
             if config.compression_mode == "avg_pool":

@@ -90,7 +90,7 @@ class VQADataset(BaseDataset):
         answer = self.data[idx]["answer"]
         image_path = self.data[idx]["image_path"]
 
-        question_prompt = f"{self.task_prompt} {question}"
+        question_prompt = self.task_prompt + question
         image = Image.open(image_path).convert("RGB")
         return question_prompt, answer, image
 

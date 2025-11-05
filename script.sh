@@ -1,1 +1,0 @@
-python run.py --model_name florence-2-base --data_dir ./Data --compression_mode none
