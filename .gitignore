@@ -17,3 +17,9 @@ test-florence.py
 Data/
 # except preprocess notebook
 !Data/preprocess.ipynb
+
+# Ignore results
+florence_predictions/
+
+# Cache
+__pycache__/

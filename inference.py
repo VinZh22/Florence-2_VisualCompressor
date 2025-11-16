@@ -1,7 +1,8 @@
 import torch
 from tqdm import tqdm
 
-from .metrics import average_normalized_levenshtein_similarity
+import pdb
+from metrics import average_normalized_levenshtein_similarity
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -46,12 +47,14 @@ def evaluate(model, processor, test_loader):
     task_prompt = "<VQA>" # Hardcoded for now
 
     ##TO FINISH
+    questions_asked = []
     predicted_answers = []
     ground_truth = []
 
     for inputs, batch_answers in tqdm(test_loader, desc="Evaluating"):
-        generated_texts = run_batch(inputs)
-
+        generated_texts = run_batch(model, processor, inputs)
+        for inp in inputs["input_ids"]:
+            questions_asked.append(processor.decode(inp, skip_special_tokens=True))
         for generated_text, answers in zip(generated_texts, batch_answers):
             parsed_answer = processor.post_process_generation(
                 generated_text,
@@ -69,7 +72,7 @@ def evaluate(model, processor, test_loader):
     avg_levenshtein_similarity = average_normalized_levenshtein_similarity(
         ground_truth, predicted_answers
     )
-    return answers, avg_levenshtein_similarity
+    return predicted_answers, ground_truth, avg_levenshtein_similarity
 
 def show_example_results(model, processor, examples):
     model.to(device)

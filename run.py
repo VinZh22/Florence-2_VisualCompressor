@@ -5,9 +5,9 @@ from PIL import Image
 import json
 import os
 
-from .train_compressor import train
-from .data import VQADataset
-from .inference import run_example, evaluate
+from train_compressor import train
+from data import VQADataset
+from inference import run_example, evaluate
 
 from soap import SOAP
 from datetime import datetime
@@ -26,13 +26,12 @@ def main(args):
     print("Loading model and processor...")
     # Load model and processor
     config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
-    config.compression_mode = args.compression_mode
-    config.compression_factor = args.compression_factor
-    config.compression_stage = args.compression_stage
-    config.compression_sorted = args.compression_sorted
-
-    processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True).to(device)
-    model = AutoModelForCausalLM.from_pretrained(model_name, config=config, trust_remote_code=True).to(device)
+    config.text_config.compression_mode = args.compression_mode
+    config.text_config.compression_factor = args.compression_factor
+    config.text_config.compression_stage = args.compression_stage
+    config.text_config.compression_sorted = args.compression_sorted
+    processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(model_name, config=config, trust_remote_code=True)
     print("Loading dataset...")
     # Create dataset and dataloader
     dataset = VQADataset(
@@ -45,13 +44,13 @@ def main(args):
     )
 
     def collate_fn(batch):
-        questions, answers, images, _ = zip(*batch)
+        questions, answers, images= zip(*batch)
         inputs = processor(
             text=list(questions), images=list(images), return_tensors="pt", padding=True
         ).to(device)
         return inputs, answers
 
-    train_size = int(0.8 * len(dataset))  # 80% train
+    train_size = int(0.9 * len(dataset))  # 80% train
     test_size = len(dataset) - train_size  # 20% test
     train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
     train_dataloader = DataLoader(train_dataset, collate_fn=collate_fn, batch_size=batch_size, shuffle=True)
@@ -77,13 +76,13 @@ def main(args):
     
     print("Running inference on test images...")
     # Inference example on test images
-    answers, avg_levenshtein_similarity = evaluate(model, processor, test_dataloader)
+    answers, ground_truth, avg_levenshtein_similarity = evaluate(model, processor, test_dataloader, test_dataset)
 
     print("Evaluation Results:")
     print(f"Average Levenshtein Similarity: {avg_levenshtein_similarity:.4f}")
     print("Sample Answers:")
     for i, answer in enumerate(answers[:5]):
-        print(f"Answer {i+1}: {answer}")
+        print(f"Answer {i+1}: {answer} | Ground Truth: {ground_truth[i]}")
     
     # Save the answers to a file
     print("Saving answers to file...")
@@ -91,6 +90,10 @@ def main(args):
     os.makedirs(args.output_dir, exist_ok=True)
     with open(output_file, "w") as f:
         json.dump(answers, f)
+    output_file = os.path.join(args.output_dir, timestamp + "_ground_truth_answers.json")
+    os.makedirs(args.output_dir, exist_ok=True)
+    with open(output_file, "w") as f:
+        json.dump(ground_truth, f)
 
     print("Done.")
 

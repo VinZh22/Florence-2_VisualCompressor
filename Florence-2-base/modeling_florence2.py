@@ -1888,7 +1888,7 @@ class Florence2Decoder(Florence2LanguagePreTrainedModel):
 
             ## NEW HERE
             # Compression Layer if specified
-            if self.compression_mode is not None and idx == self.grouping_layer:
+            if self.compression_mode != "none" and idx == self.grouping_layer:
                 # Apply compression to the hidden states
                 # hidden_states shape: (batch_size, seq_len, d_model)
                 hidden_states = self.pooling_operator(hidden_states)

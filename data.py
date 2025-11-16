@@ -13,8 +13,10 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 import random
 
+import pdb
+
 class BaseDataset(Dataset):
-    def __init__(self, split):
+    def __init__(self):
         self.name = "BaseDataset"
         self.data = []
         self.task_prompt = ""
@@ -61,8 +63,9 @@ class VQADataset(BaseDataset):
             annotations = json.load(f)
         
         with open(question_path, "r", encoding="utf-8") as f:
-            questions = json.load(f)["questions"]
+            questions = json.load(f)
         
+
         question_dict = {q["question_id"]: q for q in questions}
         
         for ann in tqdm(annotations, desc=f"Loading {self.name}"):
