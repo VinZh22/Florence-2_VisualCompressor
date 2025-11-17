@@ -80,12 +80,14 @@ class VQADataset(BaseDataset):
 
             question_text = self.correct_casing_finqa(question_data["question"], is_question=True)
             answer_text = self.correct_casing_finqa(ann["multiple_choice_answer"], is_question=False)
+            answers = [self.correct_casing_finqa(ans["answer"], is_question=False) for ans in ann["answers"]]
             
             self.data.append({
                 "image_path": image_path,
                 "question": question_text,
                 "answer": answer_text,
-                "question_id": question_id
+                "question_id": question_id,
+                'answers': answers,
             })
     
     def __getitem__(self, idx):

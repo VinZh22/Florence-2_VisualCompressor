@@ -76,10 +76,11 @@ def main(args):
     
     print("Running inference on test images...")
     # Inference example on test images
-    answers, ground_truth, avg_levenshtein_similarity = evaluate(model, processor, test_dataloader, test_dataset)
+    answers, ground_truth, avg_levenshtein_similarity, standard_accuracy = evaluate(model, processor, test_dataloader, test_dataset)
 
     print("Evaluation Results:")
     print(f"Average Levenshtein Similarity: {avg_levenshtein_similarity:.4f}")
+    print(f"Standard Accuracy: {standard_accuracy:.4f}")
     print("Sample Answers:")
     for i, answer in enumerate(answers[:5]):
         print(f"Answer {i+1}: {answer} | Ground Truth: {ground_truth[i]}")
